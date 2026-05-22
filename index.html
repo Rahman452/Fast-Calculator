@@ -1,16 +1,130 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bn">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Snake</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ultimate Calculator Pro</title>
+    <style>
+        :root { --bg: #000000; --text: #ffffff; --btn-gray: #202020; --btn-orange: #FF6600; }
+        .light-mode { --bg: #f5f5f5; --text: #000000; --btn-gray: #e0e0e0; --btn-orange: #FF9500; }
+
+        body { background-color: var(--bg); margin: 0; height: 100vh; overflow: hidden; font-family: sans-serif; transition: 0.3s; -webkit-user-select: none; user-select: none; }
+        .calculator { width: 100%; height: 100%; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; }
+        .top-bar { display: flex; justify-content: space-between; color: var(--text); padding-bottom: 20px; }
+        
+        #display-area { text-align: right; margin-top: auto; padding: 20px; }
+        #prev-calc { color: var(--btn-orange); font-size: 22px; height: 30px; }
+        #result { width: 100%; background: transparent; border: none; color: var(--text); font-size: 60px; text-align: right; overflow-x: auto; white-space: nowrap; }
+        #live-preview { color: #888; font-size: 25px; height: 30px; }
+
+        .keypad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        button { height: 75px; border: none; border-radius: 20px; font-size: 26px; cursor: pointer; background: var(--btn-gray); color: var(--text); }
+        button:active { opacity: 0.7; }
+        .orange { background-color: var(--btn-orange); color: white; }
+        .text-orange { color: var(--btn-orange); font-weight: bold; }
+
+        #history-panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); color: var(--text); display: none; padding: 20px; z-index: 100; overflow-y: auto; }
+    </style>
 </head>
 <body>
-  <canvas id="canvas"></canvas>
-  <script src="render.js"></script><!-- defines canvas, ctx, draw() -->
-  <script src="input.js"></script><!-- attaches keyboard + touch listeners -->
-  <script src="game.js"></script> <!-- state, loop, boot -->
 
+<div class="calculator">
+    <div class="top-bar">
+        <span onclick="toggleMode()">☀️/🌙</span>
+        <span onclick="toggleHistory()" style="font-weight: bold; cursor: pointer;">HISTORY</span>
+    </div>
+
+    <div id="display-area">
+        <div id="prev-calc"></div>
+        <input type="text" id="result" value="0" readonly>
+        <div id="live-preview"></div>
+    </div>
+
+    <div class="keypad">
+        <button class="text-orange" onclick="vibrate(); add('AC')">AC</button>
+        <button class="text-orange" id="delBtn">DEL</button>
+        <button class="text-orange" onclick="vibrate(); add('%')">%</button>
+        <button class="orange" onclick="vibrate(); add('/')">÷</button>
+        <button onclick="vibrate(); add('7')">7</button><button onclick="vibrate(); add('8')">8</button><button onclick="vibrate(); add('9')">9</button>
+        <button class="orange" onclick="vibrate(); add('*')">×</button>
+        <button onclick="vibrate(); add('4')">4</button><button onclick="vibrate(); add('5')">5</button><button onclick="vibrate(); add('6')">6</button>
+        <button class="orange" onclick="vibrate(); add('-')">-</button>
+        <button onclick="vibrate(); add('1')">1</button><button onclick="vibrate(); add('2')">2</button><button onclick="vibrate(); add('3')">3</button>
+        <button class="orange" onclick="vibrate(); add('+')">+</button>
+        <button onclick="vibrate(); add('00')">00</button><button onclick="vibrate(); add('0')">0</button>
+        <button onclick="vibrate(); add('.')">.</button>
+        <button class="orange" onclick="vibrate(); calculate()">=</button>
+    </div>
+</div>
+
+<div id="history-panel">
+    <h3>History</h3>
+    <div id="history-list"></div>
+    <button onclick="toggleHistory()" style="width:100%; margin-top:20px; padding: 15px; border-radius: 10px;">Back</button>
+</div>
+
+<script>
+    const res = document.getElementById('result');
+    const prev = document.getElementById('prev-calc');
+    const preview = document.getElementById('live-preview');
+    const delBtn = document.getElementById('delBtn');
+    const histPanel = document.getElementById('history-panel');
+    const histList = document.getElementById('history-list');
+
+    function vibrate() { if (navigator.vibrate) navigator.vibrate(50); }
+    function toggleMode() { document.body.classList.toggle('light-mode'); }
+    function toggleHistory() { histPanel.style.display = (histPanel.style.display === 'block') ? 'none' : 'block'; }
+    
+    function formatNum(n) { 
+        let parts = n.toString().split(".");
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        return parts.join(".");
+    }
+
+    function add(v) {
+        let cur = res.value.replace(/,/g, '');
+        if (v === 'AC') { res.value = '0'; prev.innerText = ''; preview.innerText = ''; }
+        else {
+            if (['+', '-', '*', '/'].includes(v) && ['+', '-', '*', '/'].includes(cur.slice(-1))) cur = cur.slice(0, -1);
+            res.value = (cur === '0' && v !== '.') ? v : formatNum(cur + v);
+        }
+        res.scrollLeft = res.scrollWidth;
+        updateLive();
+    }
+
+    function updateLive() {
+        let expr = res.value.replace(/,/g, '');
+        if (!expr.includes('%') && !['+', '-', '*', '/'].includes(expr.slice(-1))) {
+            try { preview.innerText = formatNum(eval(expr)); } catch { preview.innerText = ''; }
+        } else { preview.innerText = ''; }
+    }
+
+    function calculate() {
+        let expr = res.value.replace(/,/g, '');
+        // শেষে অপারেটর থাকলে তা বাদ দেওয়া
+        if (['+', '-', '*', '/'].includes(expr.slice(-1))) expr = expr.slice(0, -1);
+        
+        expr = expr.replace(/(\d+)([\+\-\*\/])(\d+)%/g, (match, p1, op, p2) => {
+            let percentValue = (parseFloat(p1) * parseFloat(p2)) / 100;
+            return p1 + op + percentValue;
+        });
+
+        try {
+            let result = eval(expr);
+            if (result === undefined || isNaN(result)) res.value = '0';
+            else {
+                histList.innerHTML += `<div style="padding:10px; border-bottom:1px solid #444;">${res.value} = ${formatNum(result)}</div>`;
+                prev.innerText = res.value + ' =';
+                res.value = formatNum(result);
+            }
+            preview.innerText = '';
+        } catch { res.value = 'Error'; }
+    }
+
+    function delAction() { vibrate(); let cur = res.value.replace(/,/g, ''); res.value = cur.length > 1 ? formatNum(cur.slice(0, -1)) : '0'; updateLive(); }
+    let timer, interval;
+    delBtn.onmousedown = delBtn.ontouchstart = (e) => { e.preventDefault(); delAction(); timer = setTimeout(() => interval = setInterval(delAction, 100), 500); };
+    delBtn.onmouseup = delBtn.onmouseleave = delBtn.ontouchend = () => { clearTimeout(timer); clearInterval(interval); };
+</script>
 </body>
 </html>
